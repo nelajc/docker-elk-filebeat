@@ -1,0 +1,82 @@
+version: '3.6'
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:6.5.4
+    container_name: elasticsearch
+    volumes:
+     - /home/ubuntu/mytemps/docker-elk-filebeat/elasticsearch/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+    ports:
+      - 9200:9200
+      - 9300:9300
+    environment:
+      ES_JAVA_OPTS: "-Xmx256m -Xms256m"
+      ELASTIC_PASSWORD: youpassword
+    networks:
+      elk:
+        aliases:
+          - elasticsearch
+        #ipv4_address: 172.27.0.5
+    restart: on-failure
+  logstash:
+    image: docker.elastic.co/logstash/logstash:6.5.4
+    container_name: logstash
+    volumes:
+      - /home/ubuntu/mytemps/docker-elk-filebeat/logstash/config:/usr/share/logstash/conf.d
+      - /home/ubuntu/mytemps/docker-elk-filebeat/logstash/pipeline/pipeline.yml:/usr/share/logstash/pipeline.yml:ro
+    ports:
+      - 5044:5044
+      - 9600:9600
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    networks:
+      elk:
+        aliases:
+          - logstashserver
+        #ipv4_address: 172.27.0.6
+    links:
+      - elasticsearch
+    restart: on-failure
+  kibana:
+    image: docker.elastic.co/kibana/kibana:6.5.4
+    container_name: kibana
+    environment:
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      ELASTICSEARCH_USERNAME: elastic
+      ELASTICSEARCH_PASSWORD: youpassword
+    ports:
+      - 5601:5601
+    networks:
+      elk:
+        aliases:
+          - kibana
+        #ipv4_address: 172.27.0.7
+    depends_on:
+      - elasticsearch
+    links:
+      - elasticsearch
+    restart: on-failure
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:6.5.4
+    container_name: filebeat
+    command: >
+      bash -c "filebeat -e -strict.perms=false
+      && filebeat modules enable logstash"
+	  #volumnes mount depend on you OS ( Windows or Linux )
+    volumes:
+      - /home/ubuntu/mytemps/docker-elk-filebeat/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /home/ubuntu/mytemps/logs:/usr/share/filebeat/logs
+    networks:
+      elk:
+        aliases:
+          - filebeat
+        #ipv4_address: 172.27.0.4
+    links:
+       - logstash
+    restart: on-failure
+networks:
+  elk:
+    driver: bridge
+    #ipam:
+      #config:
+        #- subnet: 172.27.0.0/16
+        #- gateway: 172.27.0.1
